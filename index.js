@@ -53,6 +53,7 @@ const prepare = function(sanitizedSet){
   const maxAge = _.max(sanitizedSet.map( entry => entry.Age ));
   const maxFare = _.max(sanitizedSet.map( entry => entry.Fare ));
   const minFare = _.min(sanitizedSet.map( entry => entry.Fare ));
+  const extractTitle = entry => entry.Name.split(', ')[1].split('.')[0]
   return sanitizedSet.map( entry => ({
     PassengerId: entry.PassengerId,
     Survived: entry.Survived*1,
@@ -75,10 +76,27 @@ const prepare = function(sanitizedSet){
     IsCabinF: (entry.Cabin.split('')[0] || "") === "F" ? 1 : 0,
     IsCabinG: (entry.Cabin.split('')[0] || "") === "G" ? 1 : 0,
     IsCabinT: (entry.Cabin.split('')[0] || "") === "T" ? 1 : 0,
+    isMr:     extractTitle(entry) === "Mr" ? 1 : 0,
+    isMrs:    extractTitle(entry) === "Mrs" ? 1 : 0,
+    isMiss:   extractTitle(entry) === "Miss" ? 1 : 0,
+    isMaster: extractTitle(entry) === "Master" ? 1 : 0,
+    isDon:    extractTitle(entry) === "Don" ? 1 : 0,
+    isRev:    extractTitle(entry) === "Rev" ? 1 : 0,
+    isDr:     extractTitle(entry) === "Dr" ? 1 : 0,
+    isMme:    extractTitle(entry) === "Mme" ? 1 : 0,
+    isMs:     extractTitle(entry) === "Ms" ? 1 : 0,
+    isMajor:  extractTitle(entry) === "Major" ? 1 : 0,
+    isLady:   extractTitle(entry) === "Lady" ? 1 : 0,
+    isSir:    extractTitle(entry) === "Sir" ? 1 : 0,
+    isMlle:   extractTitle(entry) === "Mlle" ? 1 : 0,
+    isCol:    extractTitle(entry) === "Col" ? 1 : 0,
+    isCapt:   extractTitle(entry) === "Capt" ? 1 : 0,
+    isTheCountess: extractTitle(entry) === "the Countess" ? 1 : 0,
+    isJonkheer: extractTitle(entry) === "Jonkheer" ? 1 : 0,
   }))
 }
 
-const toInputMatrix = preparedDataEntry => ([
+const toInputVector = preparedDataEntry => ([
   preparedDataEntry.PcClass1,
   preparedDataEntry.PcClass2,
   preparedDataEntry.IsMale,
@@ -95,67 +113,93 @@ const toInputMatrix = preparedDataEntry => ([
   preparedDataEntry.IsCabinF,
   preparedDataEntry.IsCabinG,
   preparedDataEntry.IsCabinT,
+  // preparedDataEntry.isMr,
+  // preparedDataEntry.isMrs,
+  // preparedDataEntry.isMiss,
+  // preparedDataEntry.isMaster,
+  // preparedDataEntry.isDon,
+  // preparedDataEntry.isRev,
+  // preparedDataEntry.isDr,
+  // preparedDataEntry.isMme,
+  // preparedDataEntry.isMs,
+  // preparedDataEntry.isMajor,
+  // preparedDataEntry.isLady,
+  // preparedDataEntry.isSir,
+  // preparedDataEntry.isMlle,
+  // preparedDataEntry.isCol,
+  // preparedDataEntry.isCapt,
+  // preparedDataEntry.isTheCountess,
+  // preparedDataEntry.isJonkheer,
 ])
 
-getRawTrainingSet()
-  .then(data => {
-    const sanitizedSet = sanitize(data)
-    const preparedSet = prepare(sanitizedSet)
-    const trainingSet = preparedSet.map(entry => ({
-      output: [entry.Survived],
-      input: toInputMatrix(entry),
-    }))
+trainThenTest()
 
-    const network = new NeuroNetwork.Network(16, [3, 3], 1);
-    const trainer = new NeuroNetwork.Trainer(network);
+function trainThenTest(){
+  getRawTrainingSet()
+    .then(data => {
+      const sanitizedSet = sanitize(data)
+      const preparedSet = prepare(sanitizedSet)
+      const trainingSet = preparedSet.map(entry => ({
+        output: [entry.Survived],
+        input: toInputVector(entry),
+      }))
 
-    console.log("TRAINING BEGINS!!!");
-    trainer.train(trainingSet, {
-      rate: 0.1,
-      iterations: 200000,
-      schedule: {
-        every: 5000,
-        do: function(data) {
-          var randomIndex = Math.floor(Math.random() * 100) + 0
-          var expectedResult = trainingSet[randomIndex].output;
-          var actualTestResult = network.activate(trainingSet[randomIndex].input)
-          console.log("---------");
-          console.log("Iteration: ", data.iterations);
-          console.log("Error: ", data.error);
-          console.log("Test, expectpected: ", expectedResult);
-          console.log("Test, activation result: ", actualTestResult);
-          console.log("Test error: ", Math.sqrt(Math.pow(expectedResult[0] - actualTestResult[0], 2)));
-        }
-      }
-    })
+      const network = new NeuroNetwork.Network(16, [3, 3], 1);
+      const trainer = new NeuroNetwork.Trainer(network);
 
-
-    var submResult
-    getSubmssionData()
-      .then(_submResult => {
-        submResult = _submResult
-        return getTestDataSet()
-      })
-      .then(testData => {
-        const testingSet = prepare(sanitize(testData)).map( entry => ({
-          expected: submResult.filter(_entry => entry.PassengerId === _entry.PassengerId)[0].Survived * 1,
-          input: toInputMatrix(entry),
-        }))
-
-        const testResult = testingSet.map(testDataEntry => {
-          const activationResult = network.activate(testDataEntry.input)
-          const prediction = (activationResult >= 0.5 ? 1 : 0)
-          return {
-            activationResult: activationResult,
-            expected: testDataEntry.expected,
-            prediction: prediction,
-            isCorrect: testDataEntry.expected === prediction
+      console.log("TRAINING BEGINS!!!");
+      const ITERATIONS = 200000
+      const LEARNING_RATE = 0.1
+      trainer.train(trainingSet, {
+        rate: LEARNING_RATE,
+        iterations: ITERATIONS,
+        schedule: {
+          every: 5000,
+          do: function(data) {
+            var randomIndex = Math.floor(Math.random() * 100) + 0
+            var expectedResult = trainingSet[randomIndex].output;
+            var actualTestResult = network.activate(trainingSet[randomIndex].input)
+            console.log("---------");
+            console.log("Iteration: ", data.iterations);
+            console.log("Error: ", data.error);
+            console.log("Test, expectpected: ", expectedResult);
+            console.log("Test, activation result: ", actualTestResult);
+            console.log("Test error: ", Math.sqrt(Math.pow(expectedResult[0] - actualTestResult[0], 2)));
           }
-        })
-        console.log(testResult);
-        console.log('======= SUMMARY =======');
-        const accuracy = testResult.filter(entry => entry.isCorrect).length / testResult.length
-        console.log('Accuracy: ', accuracy);
+        }
       })
-      .catch(err => console.log(err))
-  })
+
+      var submResult
+      getSubmssionData()
+        .then(_submResult => {
+          submResult = _submResult
+          return getTestDataSet()
+        })
+        .then(testData => {
+          const testingSet = prepare(sanitize(testData)).map( entry => ({
+            expected: submResult.filter(_entry => entry.PassengerId === _entry.PassengerId)[0].Survived * 1,
+            input: toInputVector(entry),
+          }))
+
+          const testResult = testingSet.map(testDataEntry => {
+            const activationResult = network.activate(testDataEntry.input)
+            const prediction = (activationResult >= 0.5 ? 1 : 0)
+            return {
+              activationResult: activationResult,
+              expected: testDataEntry.expected,
+              prediction: prediction,
+              isCorrect: testDataEntry.expected === prediction
+            }
+          })
+          console.log(testResult.map(resultEntry  => ({
+            survived    : resultEntry.expected,
+            prediction  : resultEntry.prediction,
+            isCorrect   : resultEntry.isCorrect,
+          })));
+          console.log('======= SUMMARY =======');
+          const accuracy = testResult.filter(entry => entry.isCorrect).length / testResult.length
+          console.log('Accuracy: ', accuracy);
+        })
+        .catch(err => console.log(err))
+    })
+}
