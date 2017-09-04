@@ -109,6 +109,7 @@ getRawTrainingSet()
     const network = new NeuroNetwork.Network(16, [3, 3], 1);
     const trainer = new NeuroNetwork.Trainer(network);
 
+    console.log("TRAINING BEGINS!!!");
     trainer.train(trainingSet, {
       rate: 0.1,
       iterations: 200000,
