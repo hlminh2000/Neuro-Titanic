@@ -166,6 +166,7 @@ function trainThenTest(){
       const trainer = new NeuroNetwork.Trainer(network);
 
       console.log("TRAINING BEGINS!!!");
+      const beginningTime = Date.now();
       const ITERATIONS = 200000
       const LEARNING_RATE = 0.1
       trainer.train(trainingSet, {
@@ -186,6 +187,9 @@ function trainThenTest(){
           }
         }
       })
+      const endingTime = Date.now();
+      console.log("==== TRAINING COMPLETE ====");
+      console.log("TIME TAKEN: ", endingTime - beginningTime);
 
       var submResult
       getSubmssionData()
