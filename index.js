@@ -1,10 +1,13 @@
 const csv=require('csvtojson')
-const _ = require('lodash')
-const NeuroNetwork = require('./Network.js');
+      json2csv = require('json2csv')
+      _ = require('lodash')
+      NeuroNetwork = require('./Network.js');
+      fs = require('fs');
 
 const TRAINING_SET_PATH = './data/train.csv'
-const TEST_SET_PATH = './data/test.csv'
-const GENDER_SUB_PATH = './data/gender_submission.csv'
+      TEST_SET_PATH = './data/test.csv'
+      GENDER_SUB_PATH = './data/gender_submission.csv'
+      OUTPUT_PATH = './output/output.csv'
 
 const getJsonFromCsv = function(_path){
   return new Promise(function(resolve, reject) {
@@ -20,16 +23,27 @@ const getJsonFromCsv = function(_path){
   });
 }
 
-const getRawTrainingSet = function(){
+const getRawTrainingSet = () => {
   return getJsonFromCsv(TRAINING_SET_PATH)
 }
 
-const getTestDataSet = function(){
+const getTestDataSet = () => {
   return getJsonFromCsv(TEST_SET_PATH)
 }
 
-const getSubmssionData = function(){
+const getSubmssionData = () => {
   return getJsonFromCsv(GENDER_SUB_PATH)
+}
+
+const toCsvTable = (dataSet, fieldMap) => {
+  const mappedData = dataSet.map((originalEntry) => {
+    return Object.keys(fieldMap).reduce((mappedObject, key) => {
+      mappedObject[key] = originalEntry[fieldMap[key]]
+      return mappedObject
+    }, {})
+  })
+  const fields = Object.keys(fieldMap)
+  return json2csv({ data: mappedData, fields: fields })
 }
 
 const sanitize = function(rawSet){
@@ -93,6 +107,8 @@ const prepare = function(sanitizedSet){
     isCapt:   extractTitle(entry) === "Capt" ? 1 : 0,
     isTheCountess: extractTitle(entry) === "the Countess" ? 1 : 0,
     isJonkheer: extractTitle(entry) === "Jonkheer" ? 1 : 0,
+    familySize: entry.SibSp*1 + entry.Parch*1,
+    farePerPerson: entry.Fare*1 / (entry.SibSp*1 + entry.Parch*1 + 1),
   }))
 }
 
@@ -113,6 +129,8 @@ const toInputVector = preparedDataEntry => ([
   preparedDataEntry.IsCabinF,
   preparedDataEntry.IsCabinG,
   preparedDataEntry.IsCabinT,
+  preparedDataEntry.familySize,
+  // preparedDataEntry.farePerPerson,
   // preparedDataEntry.isMr,
   // preparedDataEntry.isMrs,
   // preparedDataEntry.isMiss,
@@ -144,7 +162,7 @@ function trainThenTest(){
         input: toInputVector(entry),
       }))
 
-      const network = new NeuroNetwork.Network(16, [3, 3], 1);
+      const network = new NeuroNetwork.Network(17, [3, 3], 1);
       const trainer = new NeuroNetwork.Trainer(network);
 
       console.log("TRAINING BEGINS!!!");
@@ -179,6 +197,7 @@ function trainThenTest(){
           const testingSet = prepare(sanitize(testData)).map( entry => ({
             expected: submResult.filter(_entry => entry.PassengerId === _entry.PassengerId)[0].Survived * 1,
             input: toInputVector(entry),
+            PassengerId: entry.PassengerId*1
           }))
 
           const testResult = testingSet.map(testDataEntry => {
@@ -188,7 +207,8 @@ function trainThenTest(){
               activationResult: activationResult,
               expected: testDataEntry.expected,
               prediction: prediction,
-              isCorrect: testDataEntry.expected === prediction
+              isCorrect: testDataEntry.expected === prediction,
+              PassengerId: testDataEntry.PassengerId,
             }
           })
           console.log(testResult.map(resultEntry  => ({
@@ -199,6 +219,11 @@ function trainThenTest(){
           console.log('======= SUMMARY =======');
           const accuracy = testResult.filter(entry => entry.isCorrect).length / testResult.length
           console.log('Accuracy: ', accuracy);
+          const csvOutput = toCsvTable(testResult, {
+            'PassengerId': 'PassengerId',
+            'Survived': 'prediction',
+          })
+          fs.writeFileSync(OUTPUT_PATH, csvOutput, 'utf8')
         })
         .catch(err => console.log(err))
     })
